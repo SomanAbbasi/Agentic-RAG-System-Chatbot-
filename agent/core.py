@@ -73,8 +73,9 @@ def get_tools()->list:
     # Override description so agent knows when to use it
     web_search.description = (
         "Search the web for current, recent, or live information. "
-        "Use for news, latest releases, prices, recent events, "
-        "or anything that may have changed recently. "
+        "Use for news, latest releases, prices, recent events, people, "
+        "or anything that may have changed recently or is not well known. "
+        "Always prefer this over Wikipedia for people and recent topics. "
         "Input should be a clear search query string."
     )
     
