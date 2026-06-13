@@ -96,25 +96,22 @@ def get_memory():
 
 #Agent factory
 
-def build_agent(model:str,temperature:float,checkpointer: MemorySaver):
-     """
-        Assembles the full ReAct agent.
+def build_agent(model: str, temperature: float, checkpointer: MemorySaver, streaming: bool = True):
+    llm = ChatGroq(
+        model=model,
+        temperature=temperature,
+        api_key=os.getenv("GROQ_API_KEY"),
+        streaming=streaming,      
+    )
+    tools = get_tools()
+    prompt = system_prompt()
 
-        create_react_agent:  binds LLM + tools + prompt template together
-        AgentExecutor:       the runtime that drives the Thought/Action/Observe loop
-    """
-    
-     llm=get_llm(model,temperature)
-     tools=get_tools()
-     
-     prompt = system_prompt()
-     
-     return create_agent(
-         model=llm,
-         tools=tools,
-         system_prompt=prompt,
-         checkpointer=checkpointer
-     )
+    return create_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=prompt,
+        checkpointer=checkpointer,
+    )
      
 
 
