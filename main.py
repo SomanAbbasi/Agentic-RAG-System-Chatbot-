@@ -1,9 +1,10 @@
 import uuid
 import streamlit as st
-from langchain.messages import HumanMessage
+from langchain_core.messages import ChatMessage,HumanMessage
 from agent.core import build_agent, get_memory
 from agent.validator import Validator, build_retry_prompt
 
+# Page config
 st.set_page_config(
     page_title="AI Agent",
     page_icon="🤖",
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─ Session state bootstrap ──────────────────────────────────────
+# Session state bootstrap
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
 
@@ -21,43 +22,74 @@ if "checkpointer" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+
+    st.session_state.clean_history = []
+
 if "validator" not in st.session_state:
     st.session_state.validator = Validator()
 
-# ─ Sidebar 
+# Sidebar
 with st.sidebar:
     st.title("AI Agent")
-    st.caption("Multi-agent · RAG · Web search · Validator")
+    st.caption("Multi-agent | RAG | Web search | Validator")
     st.divider()
 
-    model = st.selectbox(
-        "Model",
-        ["llama-3.1-8b-instant","llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+    agent_model = st.selectbox(
+        "Agent model",
+        [
+            "llama-3.1-8b-instant",     
+            "llama-3.3-70b-versatile",  
+        ],
     )
     temperature = st.slider("Temperature", 0.0, 1.0, 0.7, 0.1)
 
     st.divider()
 
     use_validator = st.toggle("Enable validator", value=True)
-    max_retries   = st.slider("Max retries", 1, 3, 2) if use_validator else 0
+    max_retries   = st.slider("Max retries", 1, 3, 1) if use_validator else 0
 
     st.divider()
 
     if st.button("Clear chat", use_container_width=True):
-        st.session_state.messages = []
-        st.session_state.checkpointer = get_memory()
-        st.session_state.thread_id = str(uuid.uuid4())
+        st.session_state.messages      = []
+        st.session_state.clean_history = []
+        st.session_state.checkpointer  = get_memory()
+        st.session_state.thread_id     = str(uuid.uuid4())
         st.rerun()
 
     st.divider()
     st.caption(f"Thread: `{st.session_state.thread_id[:8]}...`")
-    st.caption("Phase 6 — Validator active")
+    st.caption("Phase 6 - Validator active")
 
 
+# Build clean messages list for agent input
+def build_messages(user_prompt: str) -> list:
+    """
+    Builds message history for agent input.
+
+    Root cause of 'Failed to call a function':
+    AIMessage always carries tool_calls=[] even when created manually.
+    Groq's function calling API rejects any history message with
+    tool_calls=[] — it expects either a populated list or no field at all.
+
+    Fix: use ChatMessage(role='assistant') instead of AIMessage.
+    ChatMessage has no tool_calls field — Groq accepts it cleanly.
+    """
+    messages = []
+    for turn in st.session_state.clean_history:
+        messages.append(HumanMessage(content=turn["user"]))
+        messages.append(
+            ChatMessage(content=turn["assistant"], role="assistant")
+        )
+    messages.append(HumanMessage(content=user_prompt))
+    return messages
+
+
+# Agent runner
 def run_agent(prompt: str, model: str, temperature: float):
     """
-    Runs the agent once. Returns (response, tool_messages, error).
-    Never raises — caller always gets a clean tuple back.
+    Runs agent once with clean message history.
+    Returns (response, tool_messages, error) — never raises.
     """
     try:
         agent = build_agent(
@@ -65,10 +97,12 @@ def run_agent(prompt: str, model: str, temperature: float):
             temperature=temperature,
             checkpointer=st.session_state.checkpointer,
         )
-        config = {"configurable": {"thread_id": st.session_state.thread_id}}
+
+        
+        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
         result = agent.invoke(
-            {"messages": [HumanMessage(content=prompt)]},
+            {"messages": build_messages(prompt)},
             config=config,
         )
 
@@ -83,15 +117,15 @@ def run_agent(prompt: str, model: str, temperature: float):
         return None, [], str(e)
 
 
+# Validator runner
 def run_validator(validator: Validator, question: str, response: str):
-
     try:
         return validator.validate(question, response)
     except Exception:
         return None
 
 
-#  Main chat area 
+# Main chat area
 st.title("AI Agent")
 
 for msg in st.session_state.messages:
@@ -107,16 +141,19 @@ if prompt := st.chat_input("Ask anything..."):
 
     with st.chat_message("assistant"):
 
-        validator      = st.session_state.validator
-        final_response = None
+        validator       = st.session_state.validator
+        final_response  = None
         final_tool_msgs = []
-        validation     = None
-        attempt        = 0
-        error_msg      = None
+        validation      = None
+        attempt         = 0
+        error_msg       = None
 
         with st.spinner("Thinking..."):
 
-            response, tool_msgs, error = run_agent(prompt, model, temperature)
+            # Attempt 1
+            response, tool_msgs, error = run_agent(
+                prompt, agent_model, temperature
+            )
             attempt = 1
 
             if error:
@@ -128,7 +165,7 @@ if prompt := st.chat_input("Ask anything..."):
                 if use_validator:
                     validation = run_validator(validator, prompt, response)
 
-                    #  Retry loop
+                    # Retry loop
                     while (
                         validation is not None
                         and not validation.passed
@@ -140,26 +177,24 @@ if prompt := st.chat_input("Ask anything..."):
                             validation=validation,
                             attempt=attempt,
                         )
-
                         response, tool_msgs, error = run_agent(
-                            retry_prompt, model, temperature
+                            retry_prompt, agent_model, temperature
                         )
                         attempt += 1
 
                         if error:
-                            # Retry itself errored — stop loop,
-                            # keep last good response
                             break
 
                         final_response  = response
                         final_tool_msgs = tool_msgs
-                        validation = run_validator(validator, prompt, response)
+                        validation = run_validator(
+                            validator, prompt, response
+                        )
 
+        # Render
         if error_msg and not final_response:
-           
             st.error(
-                "Something went wrong while generating a response. "
-                "Please try again or rephrase your question.",
+                "Something went wrong. Please try again.",
                 icon="🚨",
             )
             with st.expander("Error details", expanded=False):
@@ -168,35 +203,37 @@ if prompt := st.chat_input("Ask anything..."):
         else:
             st.markdown(final_response)
 
-            # Validation badge
             if use_validator and validation:
                 retry_label = (
-                    f" · {attempt - 1} retr{'y' if attempt == 2 else 'ies'}"
+                    f" | {attempt - 1} "
+                    f"retr{'y' if attempt == 2 else 'ies'}"
                     if attempt > 1 else ""
                 )
                 if validation.passed:
                     st.success(
-                        f"Validated — Score: {validation.score}/10{retry_label}",
+                        f"Validated - Score: {validation.score}/10"
+                        f"{retry_label}",
                         icon="✅",
                     )
                 else:
                     st.warning(
                         f"Could not fully validate after {max_retries} "
-                        f"retries — Score: {validation.score}/10. "
+                        f"retries - Score: {validation.score}/10. "
                         "Showing best attempt.",
                         icon="⚠️",
                     )
             elif use_validator and validation is None:
-                st.info("Validator unavailable for this response.", icon="ℹ️")
+                st.info(
+                    "Validator unavailable for this response.",
+                    icon="ℹ️",
+                )
 
-            # Tool calls
             if final_tool_msgs:
                 with st.expander("Agent tool calls", expanded=False):
                     for m in final_tool_msgs:
                         st.markdown(f"**Tool:** `{m.name}`")
                         st.markdown(f"**Result:** {m.content}")
 
-            # Validator trace
             if use_validator and validation:
                 with st.expander("Validator trace", expanded=False):
                     st.markdown(f"**Passed:** {validation.passed}")
@@ -205,8 +242,12 @@ if prompt := st.chat_input("Ask anything..."):
                     st.markdown(f"**Suggestion:** {validation.suggestion}")
                     st.markdown(f"**Attempts used:** {attempt}")
 
-        # Save to history only if we got a real response
+        # Save to clean_history 
         if final_response:
+            st.session_state.clean_history.append({
+                "user": prompt,
+                "assistant": final_response,
+            })
             st.session_state.messages.append(
                 {"role": "assistant", "content": final_response}
             )

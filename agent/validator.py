@@ -16,17 +16,11 @@ class ValidationResult(BaseModel):
 
 
 class Validator:
-    """
-    A second LLM call that reviews the agent's draft response.
-    Uses a fast, cheap model (8b) since this is evaluation only.
-    Returns a ValidationResult — caller decides what to do with it.
-    """
 
     def __init__(self):
-       
         self.llm = ChatGroq(
-            model="llama-3.1-8b-instant",
-            temperature=0.0,        
+            model="llama-3.3-70b-versatile",
+            temperature=0.0,
             api_key=os.getenv("GROQ_API_KEY"),
         ).with_structured_output(ValidationResult)
 
@@ -35,42 +29,32 @@ class Validator:
         user_question: str,
         agent_response: str,
     ) -> ValidationResult:
-        """
-        Evaluates the agent response against the original question.
-        Returns a ValidationResult with pass/fail, score, and feedback.
-        """
+
+        truncated = agent_response[:1500]
+        if len(agent_response) > 1500:
+            truncated += "... [truncated]"
+
         messages = [
-            SystemMessage(content="""
-                    You are a strict quality evaluator for AI responses.
-                    Evaluate the agent response against the user question.
-                    Return a structured assessment.
-
-                    SCORING CRITERIA:
-                    - Does the response directly answer the question asked? (most important)
-                    - Is the information accurate and not hallucinated?
-                    - Is the response complete — not cut off or vague?
-                    - Is the response well-structured and clear?
-                    - Did the agent use appropriate tools when needed?
-
-                    PASS CONDITIONS (passed=true, score >= 7):
-                    - Response clearly and completely answers the question
-                    - No obvious hallucinations or invented facts
-                    - Not evasive or overly generic
-
-                    FAIL CONDITIONS (passed=false, score < 7):
-                    - Response does not answer the question
-                    - Contains fabricated information
-                    - Response is incomplete or cut off
-                    - Agent said it couldn't find info but didn't try all tools
-                    - Response is off-topic
-                """),
-            HumanMessage(content=f"""
-                    User question: {user_question}
-
-                    Agent response: {agent_response}
-
-                    Evaluate this response strictly.
-                    """),
+            SystemMessage(content=(
+                "You are a quality evaluator for AI responses.\n\n"
+                "IMPORTANT EXEMPTIONS - always score 9/10 and pass=true for:\n"
+                "- Greetings (hi, hello, hey, good morning, etc)\n"
+                "- Chitchat (how are you, thanks, bye, what is your name)\n"
+                "- Simple conversational exchanges with no factual content\n"
+                "These do not need tools and should never fail validation.\n\n"
+                "FOR ALL OTHER RESPONSES score on:\n"
+                "- Does it directly answer the question?\n"
+                "- No fabricated or hallucinated facts?\n"
+                "- Used search tools for factual/real-world questions?\n\n"
+                "PASS = score 7 or above. FAIL = score below 7.\n"
+                "Be strict about hallucinated facts in factual responses.\n"
+                "Be lenient about conversational responses."
+            )),
+            HumanMessage(content=(
+                f"Question: {user_question[:300]}\n\n"
+                f"Response: {truncated}\n\n"
+                "Evaluate and return your assessment."
+            )),
         ]
 
         return self.llm.invoke(messages)
