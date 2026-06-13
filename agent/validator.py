@@ -89,16 +89,16 @@ def build_retry_prompt(
     exactly what went wrong and what to do differently.
     """
     return f"""
-The user asked: {original_question}
+        The user asked: {original_question}
 
-Your previous response (attempt {attempt}) was:
-{failed_response}
+        Your previous response (attempt {attempt}) was:
+        {failed_response}
 
-Quality check FAILED (score: {validation.score}/10).
-Reason: {validation.reason}
-What to do differently: {validation.suggestion}
+        Quality check FAILED (score: {validation.score}/10).
+        Reason: {validation.reason}
+        What to do differently: {validation.suggestion}
 
-Please try again. Address the failure reason directly.
-Use a different tool or approach if needed.
-Provide a complete, accurate answer this time.
+        Please try again. Address the failure reason directly.
+        Use a different tool or approach if needed.
+        Provide a complete, accurate answer this time.
 """
