@@ -1,6 +1,11 @@
+from urllib import response
+
 import streamlit as st
 
 import time
+
+from agent.core import get_memory,build_agent
+from langchain.callbacks.streamlit import StreamlitCallbackHandler
 
 #Page Config
 
@@ -35,7 +40,6 @@ with st.sidebar:
     model = st.selectbox(
         "Model",
         ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
-        help="Groq model selection — active from Phase 3",
     )
     
     #st.slider(label, min_value, max_value, value, step)
@@ -43,7 +47,14 @@ with st.sidebar:
     
     st.divider()
     
-    st.caption("Phase 2 — UI shell")
+    if st.button("Clear Chat",use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.memory=get_memory() #reset memory
+        st.rerun()
+        
+    st.divider()
+    st.caption("Phase 3 — ReAct agent live")
+        
     
 #Main Chat Area
 
@@ -55,22 +66,10 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         
+        
 
-#streaming function
+    
 
-def mock_stream(user_input: str):
-    """
-    Simulates a streaming LLM response word by word.
-    TODO// replace this with real Groq streaming in Phase 3.
-    """
-    response = (
-        f"[Mock response] You said: '{user_input}'. "
-        "In Phase 3 this becomes a real Groq LLM call "
-        "running inside a LangChain ReAct agent loop."
-    )
-    for word in response.split():
-        yield word + " "
-        time.sleep(0.05)
     
     
 #Chat input handler 
@@ -86,10 +85,39 @@ if prompt := st.chat_input("Type your message here..."):
     #Stream assistant response
     with st.chat_message("assistant"):
         
-        response=st.write_stream(mock_stream(prompt))
+        st_callback=StreamlitCallbackHandler(
+            st.container(),
+            expand_new_thoughts=True,
+            collapse_completed_thoughts=True,
+        )
+        
+        agent=build_agent(model,temperature)
+        
+        with st.spinner("Thinking..."):
+            ressult=agent.invoke(
+                {
+                    "inputs": prompt,
+                    "chat_history": st.session_state.memory.chat_memory.messages,
+                    
+                },
+                callbacks=[st_callback],
+            )
+            
+        response=ressult["output"]
+        
+        st.markdown(response)
+        
+        #Update memory with assistant response
+        st.session_state.memory.chat_memory.add_user_message(prompt)
+        st.session_state.memory.chat_memory.add_ai_message(response)
     
-    
-    # Save completed response to history
     st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        
+        
+        
+        
+    
+    
     
     
