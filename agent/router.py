@@ -25,21 +25,23 @@ class Router:
 
     def classify(self, message: str) -> RouteResult:
         messages = [
-            SystemMessage(content=(
-                "You are an intent classifier. "
-                "Classify the user message into exactly one intent.\n\n"
-                "intents:\n"
-                "- chitchat: greetings, thanks, bye, how are you, "
-                "your name, casual talk, opinions about preferences\n"
-                "- factual: questions about real people, companies, "
-                "news, current events, history, science, definitions, "
-                "how things work, coding questions, general knowledge\n"
-                "- rag: questions explicitly about uploaded documents, "
-                "files, PDFs, or the knowledge base\n"
-                "- math: arithmetic, calculations, percentages, "
-                "numeric expressions, unit conversions\n\n"
-                "Reply with the intent, a one line reason, "
-                "and confidence 1-10."
+           SystemMessage(content=(
+            "You are an intent classifier. "
+            "Classify the user message into exactly one intent.\n\n"
+            "intents:\n"
+            "- chitchat: greetings, thanks, bye, how are you, "
+            "your name, casual talk, opinions about preferences\n"
+            "- factual: questions about real people, companies, "
+            "news, current events, history, science, definitions, "
+            "how things work, coding questions, general knowledge\n"
+            "- rag: questions about uploaded documents, files, PDFs, "
+            "or the knowledge base. Also use this for: summarize, "
+            "explain this file, what does the document say, "
+            "tell me about the uploaded content, review this file\n"
+            "- math: arithmetic, calculations, percentages, "
+            "numeric expressions, unit conversions\n\n"
+            "Reply with the intent, a one line reason, "
+            "and confidence 1-10."
             )),
             HumanMessage(content=f"Message: {message}"),
         ]

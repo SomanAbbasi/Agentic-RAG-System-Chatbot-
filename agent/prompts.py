@@ -15,9 +15,10 @@ def system_prompt() -> str:
         "You MUST call this tool before answering any question about "
         "a real person or current fact. Never answer from memory alone.\n\n"
 
-        "2. rag_search: Use ONLY for questions about documents or files "
-        "the user has uploaded to the private knowledge base. "
-        "Do not use for general world knowledge.\n\n"
+        "2. rag_search: Use for questions about uploaded documents. "
+        "Also use when asked to summarize, explain, or review a file. "
+        "Call rag_search multiple times with different queries if the "
+        "first result does not contain enough content to summarize.\n\n"
 
         "3. wikipedia_search: Use for stable, well-established facts "
         "like history, science definitions, or concepts that do not "
@@ -27,9 +28,9 @@ def system_prompt() -> str:
         "2**10 or (4+5)*3. Never pass plain English text.\n\n"
 
         "MANDATORY RULES:\n"
-        "- Greetings and chitchat: respond directly, NO tools, no exceptions.\n"
         "- Real person or company question: call tavily_search first.\n"
-        "- Current events, prices, net worth: call tavily_search always.\n"
+        "- Summarize or explain a file: call rag_search first.\n"
+        "- Greetings and chitchat: respond directly, NO tools.\n"
         "- Coding questions: answer directly with clean commented code.\n"
         "- Never fabricate facts. If tools return nothing, say so.\n"
         "- Never use tool names not in the list above.\n"

@@ -25,12 +25,14 @@ def get_vector_store()->Chroma:
 @tool 
 def rag_search(query: str) -> str:
     """
-    ALWAYS use this tool FIRST before any other tool.
-    Search the private knowledge base for relevant information.
-    This contains uploaded documents, notes, and domain-specific content.
-    Use this for ANY question before trying web search or Wikipedia.
-    Input should be a clear question or topic to search for.
-    
+    Search the private knowledge base of user-uploaded documents.
+    Use this for questions about uploaded files or when asked to
+    summarize, explain, or review uploaded content.
+    For summarization, call this multiple times with specific topic
+    queries rather than one generic 'summarize' query.
+    Good inputs: 'main topics', 'key concepts', 'introduction',
+    'conclusions', 'chapter 1 content'.
+    Bad inputs: 'summarize', 'explain this', 'what is this about'.
     """
     
     try:
