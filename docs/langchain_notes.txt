@@ -1,0 +1,3 @@
+
+LangChain is an open-source development framework designed to simplify the creation of applications powered by Large Language Models (LLMs) (such as GPT, Gemini, and Claude). Think of it as middleware or a "Swiss Army knife" that acts as a bridge between LLMs, external databases, and software workflows.Because standalone LLMs generally cannot browse the web, access your private files, or remember past conversations on their own, LangChain provides the necessary tools and structure to overcome these limitations
+LangChain v1 was released in October 2025. It replaced AgentExecutor with create_agent. The new system uses MemorySaver for memory and @tool decorator for tools. Tools are passed directly to create_agent.

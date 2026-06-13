@@ -10,6 +10,8 @@ from langchain.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 from .prompts import system_prompt
 
+from rag.retriever import rag_search
+
 #from langchain import hub
 
 load_dotenv()
@@ -79,7 +81,7 @@ def get_tools()->list:
         "Input should be a clear search query string."
     )
     
-    return [calculator_tool,wikipedia_search,web_search]
+    return [rag_search, calculator_tool, wikipedia_search, web_search]
     
 
 # Memory
