@@ -1,23 +1,14 @@
 
 import os
-from dotenv import load_dotenv
-import numexpr as ne
-
-from langchain_groq import ChatGroq
-from langchain.agents import create_agent
-#create_agent replaces legacy AgentExecutor and create_react_agent
-#from langchain.agents import AgentExecutor, create_react_agent
-from langchain.tools import tool
-#from langchain import hub
-
 import wikipedia
-# from langchain_community.tools import WikipediaQueryRun
-# from langchain_community.utilities import WikipediaAPIWrapper
-
-# from langchain_core.chat_history import InMemoryChatMessageHistory
-# from langchain_core.runnables.history import RunnableWithMessageHistory
+import numexpr as ne
+from dotenv import load_dotenv
+from langchain_groq import ChatGroq
+from langchain_tavily import TavilySearch
+from langchain.agents import create_agent
+from langchain.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
-from prompts import system_prompt
+from .prompts import system_prompt
 
 #from langchain import hub
 
@@ -61,7 +52,6 @@ def wikipedia_search(query: str) -> str:
     background knowledge. Input should be a clear topic or question.
     """
     try:
-        import wikipedia
         results = wikipedia.search(query, results=2)
         if not results:
             return "No Wikipedia results found."
@@ -75,7 +65,20 @@ def get_tools()->list:
     Returns the list of tools available to the agent.
     """
     
-    return [calculator_tool,wikipedia_search]
+    web_search = TavilySearch(
+        max_results=3,
+        include_answer=True,
+        topic="general",
+    )
+    # Override description so agent knows when to use it
+    web_search.description = (
+        "Search the web for current, recent, or live information. "
+        "Use for news, latest releases, prices, recent events, "
+        "or anything that may have changed recently. "
+        "Input should be a clear search query string."
+    )
+    
+    return [calculator_tool,wikipedia_search,web_search]
     
 
 # Memory
@@ -111,24 +114,7 @@ def build_agent(model:str,temperature:float,checkpointer: MemorySaver):
      )
      
 
-if __name__ == "__main__":
-    agent = build_agent("llama-3.1-8b-instant", 0.0,checkpointer=MemorySaver())
-    
-    # LangGraph agents require a thread_id inside the execution config
-    config = {"configurable": {"thread_id": "user_chat_session_45"}}
-    
-    # Run user prompt 1
-    response = agent.invoke(
-        {"messages": "Hi, I am Tony. What is 5 to the power of 3?"}, 
-        config=config
-    )
-    print("Agent:", response["messages"][-1].content)
-    
-    response2 = agent.invoke(
-        {"messages": "What is my name?"}, 
-        config=config
-    )
-    print("Agent:", response2["messages"][-1].content)
+
      
      
     
